@@ -78,3 +78,9 @@ To patch the official MATR feature encoder for raw sensor input only:
 cd /autodl-fs/data/MATR_codebase
 git apply ../StreamSTAD/docs/patches/MATR_SENSOR_INPUT.patch
 ```
+
+The easier faithful sensor entrypoint keeps official MATR model/criterion/NMS/eval and supplies only the WiFiTAD sensor loader plus feature encoder wrapper:
+
+```bash
+python scripts/run_faithful_matr_sensor.py --matr-root ../MATR_codebase --config configs/wifitad_full.yaml --mode train_test_eval --run-dir runs/faithful-matr-wifitad
+```
