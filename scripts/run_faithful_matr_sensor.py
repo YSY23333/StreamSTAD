@@ -372,6 +372,24 @@ def matr_collate(batch):
     return signals, targets, infos
 
 
+def print_label_stats(dataset: WiFiTADMATRDataset, name: str) -> None:
+    bg_idx = dataset.num_classes - 1
+    counts = {label: 0 for label in dataset.label_name}
+    positives = 0
+    for i in range(len(dataset)):
+        _, target, _ = dataset[i]
+        for row in target["cls_label"]:
+            cls = int(row.argmax().item())
+            if cls == bg_idx:
+                continue
+            if 0 <= cls < len(dataset.label_name):
+                counts[dataset.label_name[cls]] += 1
+                positives += 1
+    print(f"{name} samples: {len(dataset)}")
+    print(f"{name} positive query rows: {positives}")
+    print(f"{name} positive class distribution: {counts}")
+
+
 def write_gt_json(dataset: WiFiTADMATRDataset, path: Path) -> None:
     payload = {"database": dataset.video_dict}
     with path.open("w", encoding="utf-8") as f:
@@ -460,6 +478,9 @@ def safe_make_txt(args, infos, outputs, file_path, label_map):
             cls = torch.argmax(f_cls_prob[idx][:-1], dim=0).reshape(-1)
             if f_cls_prob[idx][cls] < args.cls_threshold:
                 continue
+            cls_idx = int(cls.item())
+            if cls_idx >= len(label_map):
+                continue
             st_reg, ed_reg = f_inst_reges[idx]
             stsel = torch.argmax(f_inst_stcls[idx], dim=0).reshape(-1)
             st_offset = (stsel + st_reg) * args.num_frame
@@ -469,7 +490,7 @@ def safe_make_txt(args, infos, outputs, file_path, label_map):
             st = st * frame_to_time
             ed = ed * frame_to_time
             cur = fid * frame_to_time
-            cls_label = label_map[int(cls.item())]
+            cls_label = label_map[cls_idx]
             cls_prob = f_cls_prob[idx][cls]
             f_preds.append([
                 str(vid),
@@ -513,6 +534,7 @@ def main() -> None:
     parser.add_argument("--use-flag", action="store_true")
     parser.add_argument("--min-lr", type=float, default=1e-8)
     parser.add_argument("--nms-threshold", type=float, default=0.3)
+    parser.add_argument("--print-label-stats", action="store_true")
     parsed = parser.parse_args()
 
     cfg_path = (ROOT / parsed.config).resolve() if not Path(parsed.config).is_absolute() else Path(parsed.config)
@@ -533,6 +555,11 @@ def main() -> None:
 
     train_dataset = build_dataset(cfg, "train", parsed, label_names)
     test_dataset = build_dataset(cfg, "test", parsed, label_names)
+    if parsed.print_label_stats:
+        print_label_stats(train_dataset, "train")
+        print_label_stats(test_dataset, "test")
+        if parsed.mode == "eval":
+            return
     gt_json = run_dir / "wifitad_matr_gt.json"
     write_gt_json(test_dataset, gt_json)
     official_args = build_official_args(cfg, run_dir, gt_json, "train", parsed)
