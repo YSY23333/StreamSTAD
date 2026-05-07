@@ -169,6 +169,30 @@ def patch_official_matr_sensor_encoder(model: nn.Module, in_channels: int) -> nn
     return model
 
 
+def ensure_matr_position_capacity(model: nn.Module, num_frame: int) -> None:
+    """Expand official MATR positional encodings when sensor windows are long."""
+    if model.segment_pos_encoding.pos_embedding.shape[0] < num_frame:
+        emb = model.n_embedding_dim
+        den = torch.exp(-torch.arange(0, emb, 2) * torch.log(torch.tensor(10000.0)) / emb)
+        pos = torch.arange(0, num_frame).reshape(num_frame, 1)
+        pos_embedding = torch.zeros((num_frame, emb), device=model.segment_pos_encoding.pos_embedding.device)
+        pos_embedding[:, 0::2] = torch.sin(pos.to(pos_embedding.device) * den.to(pos_embedding.device))
+        pos_embedding[:, 1::2] = torch.cos(pos.to(pos_embedding.device) * den.to(pos_embedding.device))
+        model.segment_pos_encoding.pos_embedding = pos_embedding.unsqueeze(-2)
+        model.segment_pos_encoding.position_ids = torch.arange(num_frame, device=pos_embedding.device).expand((1, -1))
+
+    if model.memory_pos_encoding.pos_embedding.shape[0] < num_frame:
+        maxlen = max(num_frame, model.max_memory_len + 3)
+        emb = model.n_embedding_dim // 2
+        den = torch.exp(-torch.arange(0, emb, 2) * torch.log(torch.tensor(10000.0)) / emb)
+        pos = torch.arange(0, maxlen).reshape(maxlen, 1)
+        pos_embedding = torch.zeros((maxlen, emb), device=model.memory_pos_encoding.pos_embedding.device)
+        pos_embedding[:, 0::2] = torch.sin(pos.to(pos_embedding.device) * den.to(pos_embedding.device))
+        pos_embedding[:, 1::2] = torch.cos(pos.to(pos_embedding.device) * den.to(pos_embedding.device))
+        model.memory_pos_encoding.pos_embedding = pos_embedding
+        model.memory_pos_encoding.position_ids = torch.arange(maxlen, device=pos_embedding.device)
+
+
 def read_info(path: Path) -> dict[str, dict[str, int]]:
     df = pd.read_csv(path)
     return {
@@ -514,6 +538,7 @@ def main() -> None:
     official_args = build_official_args(cfg, run_dir, gt_json, "train", parsed)
     model = build_model(official_args)
     model = patch_official_matr_sensor_encoder(model, int(cfg["model"]["in_channels"])).to(device)
+    ensure_matr_position_capacity(model, parsed.num_frame)
     criterion = build_criterion(official_args, device)
     optimizer = torch.optim.Adam(model.parameters(), lr=float(cfg["training"]["learning_rate"]), weight_decay=float(cfg["training"]["weight_decay"]))
 
