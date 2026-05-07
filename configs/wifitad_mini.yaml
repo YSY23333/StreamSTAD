@@ -1,0 +1,40 @@
+seed: 2020
+device: auto
+
+dataset:
+  num_classes: 8
+  class_index_path: ../../WiFiTAD/dataset_mini/annotations/Class Index_Detection.txt
+  train:
+    info_path: ../../WiFiTAD/dataset_mini/annotations/val_video_info.csv
+    anno_path: ../../WiFiTAD/dataset_mini/annotations/val_Annotation_ours.csv
+    data_path: ../../WiFiTAD/dataset_mini/smartwifi/validation_npy
+    clip_length: 4096
+    clip_stride: 2000
+  test:
+    info_path: ../../WiFiTAD/dataset_mini/annotations/test_video_info.csv
+    anno_path: ../../WiFiTAD/dataset_mini/annotations/test_Annotation_ours.csv
+    data_path: ../../WiFiTAD/dataset_mini/smartwifi/test_npy
+    clip_length: 4096
+    clip_stride: 2000
+
+model:
+  in_channels: 30
+  hidden_dim: 128
+  num_anchors: 128
+
+training:
+  batch_size: 1
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  epochs: 1
+  checkpoint_dir: runs/wifitad_mini
+
+streaming:
+  chunk_size: 256
+  window_size: 4096
+  score_thresh: 0.05
+  top_k: 20
+
+evaluation:
+  tious: [0.3, 0.4, 0.5, 0.6, 0.7]
+  latency_budgets: [50, 100, 200, 500, 1000]
