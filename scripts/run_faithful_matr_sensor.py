@@ -384,8 +384,6 @@ def run_epoch(args, official_args, model, criterion, loader, device, optimizer=N
     seen = 0
     if output_path is not None and output_path.exists():
         output_path.unlink()
-    from util.utils import make_txt
-
     for signals, targets, infos in tqdm(loader, desc="train" if is_train else "eval"):
         signals = signals.to(device)
         targets = {k: v.to(device) for k, v in targets.items()}
@@ -404,8 +402,65 @@ def run_epoch(args, official_args, model, criterion, loader, device, optimizer=N
         for k, v in losses.items():
             totals[k] = totals.get(k, 0.0) + float(v.detach().cpu()) * batch
         if output_path is not None:
-            make_txt(official_args, infos, outputs, str(output_path), label_names)
+            safe_make_txt(official_args, infos, outputs, str(output_path), label_names)
     return {k: v / max(seen, 1) for k, v in totals.items()}
+
+
+def safe_make_txt(args, infos, outputs, file_path, label_map):
+    """Official MATR make_txt with a batch-size-1-safe offset selection."""
+    from util.utils import non_max_suppression
+
+    pred_path = file_path.format("pred")
+    Path(pred_path).touch()
+    pred_inst_clses = outputs["pred_cls"]
+    pred_inst_reges = outputs["pred_reg"]
+    pred_inst_stcls = outputs["pred_stcls"]
+    act_func = nn.Softmax(dim=1).to(pred_inst_clses.device)
+
+    stsel_all = torch.argmax(pred_inst_stcls, dim=2)
+    stregs_all = pred_inst_reges[:, :, : args.max_memory_len + 2]
+    streg_all = torch.gather(stregs_all, 2, stsel_all.unsqueeze(-1)).squeeze(-1)
+    edreg_all = pred_inst_reges[:, :, -1]
+    pred_inst_reges = torch.stack([streg_all, edreg_all], dim=-1)
+
+    for b in range(len(pred_inst_clses)):
+        vid = infos["video_name"][b]
+        fid = infos["current_frame"][b]
+        frame_to_time = infos["frame_to_time"][b]
+        f_inst_clses = pred_inst_clses[b]
+        f_inst_reges = pred_inst_reges[b]
+        f_inst_stcls = pred_inst_stcls[b]
+        f_cls_prob = act_func(f_inst_clses)
+        f_preds = []
+        for idx in range(args.num_queries):
+            cls = torch.argmax(f_cls_prob[idx][:-1], dim=0).reshape(-1)
+            if f_cls_prob[idx][cls] < args.cls_threshold:
+                continue
+            st_reg, ed_reg = f_inst_reges[idx]
+            stsel = torch.argmax(f_inst_stcls[idx], dim=0).reshape(-1)
+            st_offset = (stsel + st_reg) * args.num_frame
+            ed_offset = ed_reg * args.num_frame
+            st = fid - st_offset
+            ed = fid - ed_offset
+            st = st * frame_to_time
+            ed = ed * frame_to_time
+            cur = fid * frame_to_time
+            cls_label = label_map[int(cls.item())]
+            cls_prob = f_cls_prob[idx][cls]
+            f_preds.append([
+                str(vid),
+                round(float(cur), 2),
+                round(float(st), 2),
+                round(float(ed), 2),
+                str(cls_label),
+                round(float(cls_prob), 4),
+            ])
+        if not f_preds:
+            continue
+        f_preds = non_max_suppression(f_preds, args.nms_threshold)
+        with open(pred_path, "a+", encoding="utf-8") as f:
+            for f_pred in f_preds:
+                f.write("   ".join(str(k) for k in f_pred) + "\r\n")
 
 
 def main() -> None:
