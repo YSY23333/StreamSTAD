@@ -1,0 +1,60 @@
+diff --git a/models/models.py b/models/models.py
+index 36b099f..6ee366a 100644
+--- a/models/models.py
++++ b/models/models.py
+@@ -26,6 +26,8 @@ class MATR(nn.Module):
+         self.rgb = args.rgb
+         self.flow = args.flow
+         self.dropout=args.dropout
++        self.sensor_input = getattr(args, "sensor_input", False)
++        self.sensor_in_channels = getattr(args, "sensor_in_channels", None)
+         
+         self.use_flag = args.use_flag
+         self.flag_threshold = args.flag_threshold
+@@ -38,6 +40,14 @@ class MATR(nn.Module):
+         else:
+             self.feature_reduction_rgb = nn.Linear(self.n_feature, n_embedding_dim)
+             self.feature_reduction_flow = nn.Linear(self.n_feature, n_embedding_dim)
++        if self.sensor_input:
++            if self.sensor_in_channels is None:
++                raise ValueError("--sensor_in_channels is required when --sensor_input is enabled")
++            self.sensor_feature_encoder = nn.Sequential(
++                nn.Conv1d(self.sensor_in_channels, n_embedding_dim, kernel_size=1),
++                nn.GELU(),
++                nn.Conv1d(n_embedding_dim, n_embedding_dim, kernel_size=3, padding=1),
++            )
+         
+         # separte attention
+         self.segment_encoder, self.segment_decoder = build_transformer(args)
+@@ -160,6 +170,16 @@ class MATR(nn.Module):
+         return out
+             
+     def input_projection(self, inputs):
++        if self.sensor_input:
++            if inputs.dim() != 3:
++                raise ValueError(f"sensor input expects [B, C, T], got {tuple(inputs.shape)}")
++            if inputs.shape[1] != self.sensor_in_channels:
++                raise ValueError(
++                    f"sensor input channel mismatch: expected {self.sensor_in_channels}, got {inputs.shape[1]}"
++                )
++            base_x = self.sensor_feature_encoder(inputs.float())
++            base_x = F.adaptive_avg_pool1d(base_x, self.n_seglen)
++            return base_x.permute([2, 0, 1])
+         if self.rgb and self.flow:
+             base_x_rgb = self.feature_reduction_rgb(inputs[:,:,:self.n_feature//2])
+             base_x_flow = self.feature_reduction_flow(inputs[:,:,self.n_feature//2:])
+diff --git a/util/config.py b/util/config.py
+index c7bd5ee..7d78a51 100755
+--- a/util/config.py
++++ b/util/config.py
+@@ -25,6 +25,10 @@ def make_parser():
+     parser.add_argument('--dropout', default=0.3, type=float)
+     parser.add_argument('--training', default=True, type=bool)
+     parser.add_argument('--feat_dim', default=4096, type=int)
++    parser.add_argument('--sensor_input', action='store_true',
++                        help='accept raw sensor input shaped [B, C, T] in the model feature encoder')
++    parser.add_argument('--sensor_in_channels', default=30, type=int,
++                        help='sensor channel count used when --sensor_input is enabled')
+     parser.add_argument('--hidden_dim', default=1024, type=int)
+     parser.add_argument('--ffn_dim', default=2048, type=int)
+     parser.add_argument('--e_nheads', default=8, type=int)

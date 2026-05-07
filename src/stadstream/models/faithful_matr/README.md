@@ -32,4 +32,26 @@ pip install -r src/stadstream/models/faithful_matr/requirements.txt
 python scripts/faithful_matr_smoke.py --matr-root ../MATR_codebase --config configs/wifitad_full.yaml
 ```
 
+## Apply Minimal Sensor Feature Encoder Patch
+
+The patch in `docs/patches/MATR_SENSOR_INPUT.patch` changes only:
+
+- `models/models.py`: adds a gated sensor branch in `MATR.input_projection`
+- `util/config.py`: adds `--sensor_input` and `--sensor_in_channels`
+
+Apply it to the official MATR repo:
+
+```bash
+cd /autodl-fs/data/MATR_codebase
+git apply ../StreamSTAD/docs/patches/MATR_SENSOR_INPUT.patch
+```
+
+Then run official MATR with:
+
+```bash
+--sensor_input --sensor_in_channels 30
+```
+
+When `--sensor_input` is not set, the original RGB/flow feature path is unchanged.
+
 The smoke script only validates that official MATR can be imported and receives sensor features in its expected shape. Full faithful training/evaluation should remain in the official MATR project or call its original entrypoints.

@@ -71,3 +71,10 @@ git clone https://github.com/skhcjh231/MATR_codebase.git
 cd /autodl-fs/data/StreamSTAD
 python scripts/faithful_matr_smoke.py --matr-root ../MATR_codebase --config configs/wifitad_full.yaml
 ```
+
+To patch the official MATR feature encoder for raw sensor input only:
+
+```bash
+cd /autodl-fs/data/MATR_codebase
+git apply ../StreamSTAD/docs/patches/MATR_SENSOR_INPUT.patch
+```
