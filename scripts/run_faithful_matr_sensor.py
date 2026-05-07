@@ -28,6 +28,24 @@ from stadstream.data.wifitad import load_class_index
 
 def add_matr_root(matr_root: str | Path) -> Path:
     root = Path(matr_root).resolve()
+    if not root.exists():
+        raise FileNotFoundError(f"MATR root does not exist: {root}")
+    required = [root / "models", root / "criterion", root / "util", root / "eval.py"]
+    missing = [str(path) for path in required if not path.exists()]
+    if missing:
+        raise FileNotFoundError(f"MATR root is missing official files: {missing}")
+    for name in [
+        "criterion",
+        "criterion.criterion",
+        "criterion.matcher",
+        "models",
+        "models.models",
+        "models.transformer",
+        "util",
+        "util.utils",
+        "eval",
+    ]:
+        sys.modules.pop(name, None)
     sys.path.insert(0, str(root))
     sys.path.insert(0, str(root / "Evaluation"))
     return root
@@ -487,4 +505,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
