@@ -60,3 +60,14 @@ python scripts/run_experiment.py --config configs/wifitad_mini.yaml --model slim
 python scripts/run_experiment.py --config configs/wifitad_mini.yaml --model slimstad --mode stream_test --checkpoint runs/slimstad-mini/checkpoint_last.pt --run-dir runs/slimstad-mini
 python scripts/run_experiment.py --config configs/wifitad_mini.yaml --model slimstad --mode eval --pred runs/slimstad-mini/slimstad_stream_predictions.json --run-dir runs/slimstad-mini
 ```
+
+## Faithful MATR
+
+Strict MATR reproduction adapter lives in `src/stadstream/models/faithful_matr/`. It is intentionally separate from `matr_signal.py`.
+
+```bash
+cd /autodl-fs/data
+git clone https://github.com/skhcjh231/MATR_codebase.git
+cd /autodl-fs/data/StreamSTAD
+python scripts/faithful_matr_smoke.py --matr-root ../MATR_codebase --config configs/wifitad_full.yaml
+```
