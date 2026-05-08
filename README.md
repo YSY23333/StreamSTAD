@@ -61,6 +61,20 @@ python scripts/run_experiment.py --config configs/wifitad_mini.yaml --model slim
 python scripts/run_experiment.py --config configs/wifitad_mini.yaml --model slimstad --mode eval --pred runs/slimstad-mini/slimstad_stream_predictions.json --run-dir runs/slimstad-mini
 ```
 
+## STADStream V1
+
+Sensor-native chunk-level online TAD:
+
+```bash
+python scripts/run_stadstream.py --config configs/wifitad_full.yaml --mode train_test_eval --run-dir runs/stadstream-w512-s256 --window-size 512 --stride 256
+```
+
+Debug on mini:
+
+```bash
+python scripts/run_stadstream.py --config configs/wifitad_mini.yaml --mode train_test_eval --run-dir runs/stadstream-mini --window-size 512 --stride 256
+```
+
 ## Faithful MATR
 
 Strict MATR reproduction adapter lives in `src/stadstream/models/faithful_matr/`. It is intentionally separate from `matr_signal.py`.
